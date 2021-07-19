@@ -1,0 +1,3 @@
+CREATE DATABASE "events";
+CREATE USER events_user WITH ENCRYPTED PASSWORD 'password';
+GRANT ALL PRIVILEGES ON DATABASE events TO events_user;
