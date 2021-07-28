@@ -14,34 +14,22 @@ type EventService struct {
 	r *postgres.EventStorage
 }
 
-func (e *EventService) Events() ([]events.Event, error) {
-	var ee []events.Event
-
-	/*start := time.Now()
-	end := start.Add(time.Hour * 24 * 7)*/
-
-	/*for i := 0; i < 10; i++ {
-		ee = append(ee, events.Event{
-			ID:             i,
-			Title:          fmt.Sprintf("Title %d", i),
-			Description:    "Some description",
-			IsVirtual:      false,
-			Address:        "An address",
-			Link:           "",
-			NumberOfSeats:  100,
-			StartTime:      &start,
-			EndTime:        &end,
-			WelcomeMessage: "",
-			IsPublished:    false,
-		})
-	}*/
-
-	ee, err := e.r.Events()
+func (s *EventService) Events() ([]events.Event, error) {
+	ee, err := s.r.Events()
 	if err != nil {
 		return nil, err
 	}
 
 	return ee, nil
+}
+
+func (s *EventService) Event(id int) (*events.Event, error) {
+	e, err := s.r.Event(id)
+	if err != nil {
+		return nil, err
+	}
+
+	return e, nil
 }
 
 func (s *EventService) CreateEvent(e *events.Event) (int,  error) {

@@ -10,8 +10,8 @@ type Event struct {
 	Address        string
 	Link           string
 	NumberOfSeats  int
-	StartTime      *time.Time
-	EndTime        *time.Time
+	StartTime      time.Time
+	EndTime        time.Time
 	WelcomeMessage string
 	IsPublished    bool
 }

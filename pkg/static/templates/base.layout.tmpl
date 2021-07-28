@@ -1,0 +1,38 @@
+{{define "base"}}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>{{template "title" .}} - Events</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body class="mat-typography mat-app-background">
+<ul>
+    <li>
+        <a href="/">Home</a>
+    </li>
+    <li>
+        <a href="/login">Login</a>
+    </li>
+    <li>
+        <a href="/register">Sign up</a>
+    </li>
+    <li>
+        <a href="/events">Events</a>
+    </li>
+    <li>
+        <a href="/events/create">Create event</a>
+    </li>
+    <li>
+        <a href="/logout">Logout</a>
+    </li>
+</ul>
+
+<main>
+    {{template "body" .}}
+</main>
+
+</body>
+</html>
+{{end}}
