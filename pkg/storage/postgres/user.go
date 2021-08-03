@@ -65,6 +65,8 @@ func (s *UserStorage) User(uid int) (*events.User, error) {
 		return nil, err
 	}
 
+	u.ID = uid
+
 	return &u, nil
 }
 

@@ -2,25 +2,29 @@ package http
 
 import (
 	"github.com/gorilla/mux"
+	"github.com/justinas/alice"
 	"net/http"
 )
 
 func (a *App) Routes() http.Handler {
+	sessionMiddleware := alice.New(a.Session.Enable, a.addUserToSession)
+	authenticatedOnly := alice.New(sessionMiddleware.Then, a.authenticatedUser)
+
 	m := mux.NewRouter()
-	m.HandleFunc("/", a.home)
-	m.HandleFunc("/events", a.showEvents)
+	m.Handle("/", sessionMiddleware.Then(http.HandlerFunc(a.home))).Methods("GET")
+	m.Handle("/events", authenticatedOnly.Then(http.HandlerFunc(a.showEvents))).Methods("GET")
 	// :[0-9]+ is regex. Makes sure it starts with a number in this case.
-	m.HandleFunc("/events/{eventID:[0-9]+}", a.showEvent)
+	m.Handle("/events/{eventID:[0-9]+}", sessionMiddleware.Then(http.HandlerFunc(a.showEvent))).Methods("GET")
 	// it only goes to this one if the request is post
-	m.HandleFunc("/events/create", a.createEvent).Methods("POST")
-	m.HandleFunc("/events/create", a.showEventForm)
-	m.HandleFunc("/contact", a.contact)
+	m.Handle("/events/create", authenticatedOnly.Then(http.HandlerFunc(a.createEvent))).Methods("POST")
+	m.Handle("/events/create", authenticatedOnly.Then(http.HandlerFunc(a.showEventForm))).Methods("GET")
+	m.Handle("/contact", sessionMiddleware.Then(http.HandlerFunc(a.contact))).Methods("GET")
 	// gorilla mux package allows us to add the methods.
-	m.HandleFunc("/register", a.register).Methods("POST")
-	m.HandleFunc("/register", a.showRegistrationForm)
-	m.HandleFunc("/login", a.login).Methods("POST")
-	m.HandleFunc("/login", a.showLoginForm)
-	m.HandleFunc("/logout", a.logout)
+	m.Handle("/register", sessionMiddleware.Then(http.HandlerFunc(a.register))).Methods("POST")
+	m.Handle("/register", sessionMiddleware.Then(http.HandlerFunc(a.showRegistrationForm))).Methods("GET")
+	m.Handle("/login", sessionMiddleware.Then(http.HandlerFunc(a.login))).Methods("POST")
+	m.Handle("/login", sessionMiddleware.Then(http.HandlerFunc(a.showLoginForm))).Methods("GET")
+	m.Handle("/logout", sessionMiddleware.Then(http.HandlerFunc(a.logout))).Methods("GET")
 	m.Handle("/about", About{})
 
 	m.Handle("/test", a.myMiddleware(http.HandlerFunc(a.test)))
@@ -31,7 +35,5 @@ func (a *App) Routes() http.Handler {
 	m.PathPrefix("/static/").Handler(
 		http.StripPrefix("/static/", http.FileServer(http.Dir("./pkg/static"))))
 
-	return a.Session.Enable(
-		a.addUserToSession(m),
-		) // todo:: fix, not all request needs a session
+	return m
 }

@@ -14,7 +14,7 @@ type EventStorage struct {
 	DB *sql.DB
 }
 
-func (s *EventStorage) SaveEvent(e *events.Event) (int, error) {
+func (s *EventStorage) SaveEvent(e *events.Event, uid int) (int, error) {
 
 	query := `INSERT INTO events 
     			(title, 
@@ -25,10 +25,12 @@ func (s *EventStorage) SaveEvent(e *events.Event) (int, error) {
      			number_of_seats, 
     			start_time, 
     			end_time, 
-    			welcome_message, 
-    			is_published) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`
+    			welcome_message,
+    			host_id,
+    			is_published) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`
 
-	row := s.DB.QueryRow(query, e.Title, e.Description, e.IsVirtual, e.Address, e.Link, e.NumberOfSeats, e.StartTime, e.EndTime, e.WelcomeMessage, e.IsPublished)
+	row := s.DB.QueryRow(query, e.Title, e.Description, e.IsVirtual, e.Address, e.Link, e.NumberOfSeats,
+		e.StartTime, e.EndTime, e.WelcomeMessage, uid, false)
 	var id int
 	err := row.Scan(&id)
 	if err != nil {
@@ -39,9 +41,9 @@ func (s *EventStorage) SaveEvent(e *events.Event) (int, error) {
 	return id, nil
 }
 
-func (s *EventStorage) Events() ([]events.Event, error) {
+func (s *EventStorage) Events(uid int) ([]events.Event, error) {
 
-	query := "SELECT id, title FROM events"
+	query := fmt.Sprintf("SELECT id, title FROM events WHERE host_ID = %d", uid)
 
 	rows, err := s.DB.Query(query)
 	if err != nil {

@@ -13,5 +13,6 @@ type Event struct {
 	StartTime      time.Time
 	EndTime        time.Time
 	WelcomeMessage string
+	HostID		   int
 	IsPublished    bool
 }

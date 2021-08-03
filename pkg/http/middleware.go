@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 )
@@ -30,16 +31,34 @@ func (a *App) addUserToSession(handler http.Handler) http.Handler {
 			return
 		}
 
-		fmt.Println("user id:", uid)
-
 		u, err := a.UserService.User(uid)
 		if err != nil {
-			// todo:: handle error
+			// todo:: handle error (remove session)
 			fmt.Println(err)
 			return
 		}
-		fmt.Println("user id:", u)
+
+		// creates a new context from the request's existing context
+		ctx := context.WithValue(r.Context(), "user", u)
+
+		// manually associate the new context with the request
+		r = r.WithContext(ctx)
+
+		// continue call to the handler with the new request
 		handler.ServeHTTP(w, r)
+	}
+
+	return http.HandlerFunc(f)
+}
+
+func (a App) authenticatedUser(next http.Handler) http.Handler {
+	f := func(w http.ResponseWriter, r *http.Request) {
+		if r.Context().Value("user") == nil {
+			http.Redirect(w, r, "/login", http.StatusUnauthorized)
+			return
+		}
+
+		next.ServeHTTP(w, r)
 	}
 
 	return http.HandlerFunc(f)

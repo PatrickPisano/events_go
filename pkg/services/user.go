@@ -44,7 +44,7 @@ func (s *UserService) EmailMatchPassword(email string, password string) (bool, i
 	return true, id, nil
 }
 
-func (s *UserService) User(uid int) (*events.User, error){
+func (s *UserService) User(uid int) (*events.User, error) {
 	u, err := s.r.User(uid)
 
 	if err != nil {

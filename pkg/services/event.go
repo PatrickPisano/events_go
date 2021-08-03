@@ -14,8 +14,8 @@ type EventService struct {
 	r *postgres.EventStorage
 }
 
-func (s *EventService) Events() ([]events.Event, error) {
-	ee, err := s.r.Events()
+func (s *EventService) Events(uid int) ([]events.Event, error) {
+	ee, err := s.r.Events(uid)
 	if err != nil {
 		return nil, err
 	}
@@ -32,8 +32,8 @@ func (s *EventService) Event(id int) (*events.Event, error) {
 	return e, nil
 }
 
-func (s *EventService) CreateEvent(e *events.Event) (int,  error) {
-	id, err := s.r.SaveEvent(e)
+func (s *EventService) CreateEvent(e *events.Event, uid int) (int,  error) {
+	id, err := s.r.SaveEvent(e, uid)
 	if err != nil {
 		return 0, err
 	}

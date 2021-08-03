@@ -1,6 +1,7 @@
 package http
 
 import (
+	"errors"
 	"events/pkg/events"
 	"events/pkg/services"
 	"fmt"
@@ -82,6 +83,12 @@ func (a *App) createEvent(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	u, ok := r.Context().Value("user").(*events.User)
+	if !ok {
+		a.serverError(w, r, errors.New("user was not found in the request context"))
+		return
+	}
+
 	e := &events.Event{
 		// use PostForm to only get values from post (not get - the url)
 		Title:          r.PostForm.Get("title"),
@@ -93,10 +100,11 @@ func (a *App) createEvent(w http.ResponseWriter, r *http.Request) {
 		StartTime:      startTime,
 		EndTime:        endTime,
 		WelcomeMessage: r.PostForm.Get("welcome_message"),
+		HostID:	 		u.ID,
 		IsPublished:    false,
 	}
 
-	id, err := a.EventService.CreateEvent(e)
+	id, err := a.EventService.CreateEvent(e, u.ID)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -106,7 +114,14 @@ func (a *App) createEvent(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) showEvents(w http.ResponseWriter, r *http.Request) {
-	ee, err := a.EventService.Events()
+
+	u, ok := r.Context().Value("user").(*events.User)
+	if !ok  {
+		a.serverError(w, r, errors.New("user not found in request context"))
+		return
+	}
+
+	ee, err := a.EventService.Events(u.ID)
 	if err != nil {
 		fmt.Println(err) // todo:: handle error
 	}
@@ -193,6 +208,7 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Login was not successful"))
 	}
 
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 	// 303 good for when people need to be redirected after signing up, etc
 	// http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
@@ -221,7 +237,7 @@ func (a *App) notFound(w http.ResponseWriter, r *http.Request) {
 func (a *App) serverError(w http.ResponseWriter, r *http.Request, err error) {
 	fmt.Println(err)
 	w.WriteHeader(http.StatusInternalServerError)
-	w.Write([]byte("Page was not found"))
+	w.Write([]byte("Internal server error"))
 }
 
 func NewTemplateCache(dir string) (map[string]*template.Template, error) {
@@ -295,8 +311,15 @@ type templateData struct {
 }
 
 func (a *App) addDefaultData(r *http.Request, data interface{}) *templateData {
+	//u, _ := events.UserFromContext(r.Context())
+
+	u, _ := r.Context().Value("user").(*events.User)
+	fmt.Println(u)
 
 	td := &templateData{
+		User: u,
+		//Flash: a.Session.PopString(r, "flash")
+		//CurrentYear: time.Now().Year()
 		Data: data,
 	}
 

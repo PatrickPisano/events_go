@@ -25,12 +25,12 @@ CREATE TABLE events
     end_time timestamptz,
     welcome_message VARCHAR (256),
     is_published BOOLEAN,
-    --host INT NOT NULL,
+    host_id INT NOT NULL,
 
-    PRIMARY KEY (id)
-    --FOREIGN KEY (host)
-        --REFERENCES users (id)
-        --ON DELETE CASCADE
+    PRIMARY KEY (id),
+    FOREIGN KEY (host_id)
+        REFERENCES users (id)
+        ON DELETE CASCADE
 );
 
 DROP TABLE IF EXISTS user_events;
