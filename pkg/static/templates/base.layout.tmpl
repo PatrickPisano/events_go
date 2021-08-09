@@ -37,6 +37,10 @@
     {{.Names}}
 {{end}}
 
+{{with .Flash}}
+    {{.}}
+{{end}}
+
 <main>
     {{template "body" .}}
 </main>

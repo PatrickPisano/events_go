@@ -18,6 +18,9 @@ func (a *App) Routes() http.Handler {
 	// it only goes to this one if the request is post
 	m.Handle("/events/create", authenticatedOnly.Then(http.HandlerFunc(a.createEvent))).Methods("POST")
 	m.Handle("/events/create", authenticatedOnly.Then(http.HandlerFunc(a.showEventForm))).Methods("GET")
+
+	m.Handle("/events/{eventID:[0-9]+}/edit", authenticatedOnly.Then(http.HandlerFunc(a.updateEvent))).Methods("POST")
+	m.Handle("/events/{eventID:[0-9]+}/edit", authenticatedOnly.Then(http.HandlerFunc(a.showUpdateEventForm))).Methods("GET")
 	m.Handle("/contact", sessionMiddleware.Then(http.HandlerFunc(a.contact))).Methods("GET")
 	// gorilla mux package allows us to add the methods.
 	m.Handle("/register", sessionMiddleware.Then(http.HandlerFunc(a.register))).Methods("POST")

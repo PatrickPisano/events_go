@@ -11,7 +11,13 @@ import (
 	"net/http"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
+)
+
+const (
+	sessionKeyUser string = "userID"
+	sessionKeyFlash = "flash"
 )
 
 type App struct {
@@ -37,51 +43,7 @@ func (a *App) createEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var isVirtual bool
-
-	if t := r.PostForm.Get("is_virtual"); t == "virtual" {
-		isVirtual = true
-	} else if t == "physical" {
-		isVirtual = false
-	} else {
-		// todo:: return an error
-		panic("unexpected type for the 'is_virtual' field")
-	}
-
-	var numOfSeats int
-
-	numOfSeatsStr := r.PostForm.Get("number_of_seats")
-	if numOfSeatsStr != "" {
-		numOfSeats, err = strconv.Atoi(numOfSeatsStr)
-		if err != nil {
-			// todo:: return an error
-			panic(err)
-		}
-	}
-
-	layout := "2006-01-02T15:04"
-
-	var startTime time.Time
-
-	startTimeStr := r.PostForm.Get("start_time")
-	if startTimeStr != "" {
-		startTime, err = time.Parse(layout, startTimeStr)
-		if err != nil {
-			// todo:: return an error
-			panic(err)
-		}
-	}
-
-	var endTime time.Time
-
-	endTimeStr := r.PostForm.Get("end_time")
-	if endTimeStr != "" {
-		endTime, err = time.Parse(layout, endTimeStr)
-		if err != nil {
-			// todo:: return an error
-			panic(err)
-		}
-	}
+	e, emails := eventFromRequest(r)
 
 	u, ok := r.Context().Value("user").(*events.User)
 	if !ok {
@@ -89,22 +51,7 @@ func (a *App) createEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	e := &events.Event{
-		// use PostForm to only get values from post (not get - the url)
-		Title:          r.PostForm.Get("title"),
-		Description:    r.PostForm.Get("description"),
-		IsVirtual:      isVirtual,
-		Address:        r.PostForm.Get("address"),
-		Link:           r.PostForm.Get("link"),
-		NumberOfSeats:  numOfSeats,
-		StartTime:      startTime,
-		EndTime:        endTime,
-		WelcomeMessage: r.PostForm.Get("welcome_message"),
-		HostID:	 		u.ID,
-		IsPublished:    false,
-	}
-
-	id, err := a.EventService.CreateEvent(e, u.ID)
+	id, err := a.EventService.CreateEvent(e, emails, u.ID)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -113,8 +60,56 @@ func (a *App) createEvent(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, fmt.Sprintf("/events/%d", id), http.StatusSeeOther)
 }
 
-func (a *App) showEvents(w http.ResponseWriter, r *http.Request) {
+func (a *App) showUpdateEventForm(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+	eventID, err := strconv.Atoi(params["eventID"])
+	if err != nil {
+		fmt.Errorf("invalid url")
+		return
+	}
 
+	e, err := a.EventService.Event(eventID)
+	var notFoundErr error = &events.ErrNotFound{Err: err}
+	if errors.As(err, &notFoundErr) {
+		a.notFound(w, r)
+		return
+	} else if err != nil {
+		a.serverError(w, r, err)
+		return
+	}
+
+	a.render(w, r, "update-event-form.page.tmpl", e)
+}
+
+func (a *App) updateEvent(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(mux.Vars(r)["eventID"])
+	if err != nil {
+		a.notFound(w, r)
+		return
+	}
+
+	err = r.ParseForm()
+	if err != nil {
+		fmt.Println(err)
+		// todo:: handle client error
+		return
+	}
+
+	e, _ := eventFromRequest(r)
+	e.ID = id
+
+	err = a.EventService.UpdateEvent(e)
+	if err != nil {
+		a.serverError(w, r, err)
+		return
+	}
+
+	a.Session.Put(r, sessionKeyFlash, "Event successfully updated!") // todo:: save flash value
+
+	http.Redirect(w, r, fmt.Sprintf("/events/%d", id), http.StatusSeeOther)
+}
+
+func (a *App) showEvents(w http.ResponseWriter, r *http.Request) {
 	u, ok := r.Context().Value("user").(*events.User)
 	if !ok  {
 		a.serverError(w, r, errors.New("user not found in request context"))
@@ -139,7 +134,14 @@ func (a *App) showEvent(w http.ResponseWriter, r *http.Request) {
 
 	e, err := a.EventService.Event(id)
 	if err != nil {
-		fmt.Println(err) // todo:: handle error
+		notFound := &events.ErrNotFound{}
+		if errors.As(err, &notFound) {
+			a.notFound(w, r)
+			return
+		}
+
+		a.serverError(w, r, err)
+		return
 	}
 
 	a.render(w, r, "event-detail.page.tmpl", e)
@@ -202,7 +204,7 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if match {
-		a.Session.Put(r, "userID", id) // todo:: use a const to save keys
+		a.Session.Put(r, sessionKeyUser, id) // todo:: use a const to save keys
 		w.Write([]byte("Logged in"))
 	} else {
 		w.Write([]byte("Login was not successful"))
@@ -214,7 +216,7 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) logout(w http.ResponseWriter, r *http.Request) {
-	a.Session.Remove(r, "userID")
+	a.Session.Remove(r, sessionKeyUser)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
@@ -270,10 +272,10 @@ func NewTemplateCache(dir string) (map[string]*template.Template, error) {
 
 		// Use the ParseGlob method to add any 'partial' templates to the
 		// template set.
-		/*ts, err = ts.ParseGlob(filepath.Join(dir, "*.partial.tmpl"))
+		ts, err = ts.ParseGlob(filepath.Join(dir, "*.partial.tmpl"))
 		if err != nil {
 			return nil, err
-		}*/
+		}
 
 		// Add the template set to the cache, using the name of the page
 		// (like 'home.page.tmpl') as the key.
@@ -318,10 +320,51 @@ func (a *App) addDefaultData(r *http.Request, data interface{}) *templateData {
 
 	td := &templateData{
 		User: u,
-		//Flash: a.Session.PopString(r, "flash")
-		//CurrentYear: time.Now().Year()
+		Flash: a.Session.PopString(r, sessionKeyFlash),
+		//CurrentYear: time.Now().Year(),
 		Data: data,
 	}
 
 	return td
+}
+
+func eventFromRequest(r *http.Request) (*events.Event, []string) {
+	var err error
+	var layout = "2006-01-02T15:04"
+
+	var startTime time.Time
+	startTimeStr := r.PostForm.Get("start_time")
+	if startTimeStr != "" {
+		startTime, err = time.Parse(layout, startTimeStr)
+		if err != nil {
+			// todo:: handle error
+			panic(err)
+		}
+	}
+
+	var stopTime time.Time
+	stopTimeStr := r.PostForm.Get("stop_time")
+	if stopTimeStr != "" {
+		startTime, err = time.Parse(layout, stopTimeStr)
+		if err != nil {
+			// todo:: handle error
+			panic(err)
+		}
+	}
+
+	e := &events.Event{
+		Title: r.PostForm.Get("title"),
+		Description: r.PostForm.Get("description"),
+		Link: r.PostForm.Get("link"),
+		StartTime: startTime,
+		EndTime: stopTime,
+		WelcomeMessage: r.PostForm.Get("welcome_message"),
+		IsPublished: false,
+	}
+
+	emailsStr := r.PostForm.Get("invitations")         // format " email1@example.com, email2@example.com,email3@example.com"
+	emailsStr = strings.ReplaceAll(emailsStr, " ", "") // new format "email1@example.com,email2@example.com,email3@example.com"
+	emails := strings.Split(emailsStr, ",") // new data ["email1@example.com", "email2@example.com", "email3@example.com"]
+
+	return e, emails
 }

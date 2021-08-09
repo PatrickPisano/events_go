@@ -18,13 +18,13 @@ func (a *App) myMiddleware(handler http.Handler) http.Handler {
 
 func (a *App) addUserToSession(handler http.Handler) http.Handler {
 	f := func(w http.ResponseWriter, r *http.Request) {
-		exists := a.Session.Exists(r, "userID")
+		exists := a.Session.Exists(r, sessionKeyUser)
 		if !exists {
 			handler.ServeHTTP(w, r)
 			return
 		}
 
-		uid := a.Session.GetInt(r, "userID")
+		uid := a.Session.GetInt(r, sessionKeyUser)
 		if uid == 0 {
 			// todo:: handle error
 			fmt.Println("error: uid is zero")

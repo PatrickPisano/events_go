@@ -17,13 +17,11 @@ CREATE TABLE events
     id SERIAL,
     title VARCHAR(64),
     description VARCHAR (512),
-    is_virtual BOOLEAN,
-    address VARCHAR(128),
     link VARCHAR(128),
-    number_of_seats INT,
     start_time timestamptz,
     end_time timestamptz,
     welcome_message VARCHAR (256),
+    cover_image_path VARCHAR (128),
     is_published BOOLEAN,
     host_id INT NOT NULL,
 
@@ -38,6 +36,8 @@ CREATE TABLE user_events
 (
     user_id INT,
     event_id INT,
+    has_responded BOOLEAN DEFAULT FALSE,
+    response BOOLEAN DEFAULT FALSE,
 
     FOREIGN KEY (user_id)
         REFERENCES users (id)
