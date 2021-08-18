@@ -2,8 +2,10 @@ package postgres
 
 import (
 	"database/sql"
+	errors2 "events/pkg/errors"
 	"events/pkg/events"
 	"fmt"
+	"github.com/lib/pq"
 )
 
 func NewUserStorage(db *sql.DB) *UserStorage {
@@ -15,6 +17,8 @@ type UserStorage struct {
 }
 
 func (s *UserStorage) SaveUser(e *events.User, password string) (int, error) {
+	const op = "userStorage.SaveUser"
+
 	query := `INSERT INTO users 
     			(names, 
      			 email,
@@ -25,14 +29,21 @@ func (s *UserStorage) SaveUser(e *events.User, password string) (int, error) {
 	var id int
 	err := row.Scan(&id)
 	if err != nil {
-		// todo:: check for not found error
-		return 0, err
+		if pqErr, ok := err.(*pq.Error); ok {
+			switch pqErr.Code.Name() {
+			case /*"foreign_key_violation",*/ "unique_violation":
+				return 0, errors2.Wrap(&events.ErrConflict{Err: pqErr}, op, "executing query")
+			}
+		}
+		return 0, errors2.Wrap(err, op, "executing query")
 	}
 
 	return id, nil
 }
 
 func (s *UserStorage) UserIDAndPasswordByEmail(email string) (int, string, error) {
+	const op = "userStorage.UserIDAndPasswordByEmail"
+
 	query := "SELECT id, password FROM users WHERE email=$1"
 
 	row := s.DB.QueryRow(query, email)
@@ -42,14 +53,18 @@ func (s *UserStorage) UserIDAndPasswordByEmail(email string) (int, string, error
 
 	err := row.Scan(&id, &password)
 	if err != nil {
-		// todo:: check for not found error
-		return 0, "", err
+		if err == sql.ErrNoRows {
+			return 0, "", errors2.Wrap(&events.ErrNotFound{Err: err}, op, "executing query")
+		}
+		return 0, "", errors2.Wrap(&events.ErrNotFound{Err: err}, op, "executing query")
 	}
 
 	return id, password, nil
 }
 
 func (s *UserStorage) User(uid int) (*events.User, error) {
+	const op = "userStorage.User"
+
 	query := fmt.Sprintf("SELECT names, email FROM users WHERE id=%v", uid)
 
 	row := s.DB.QueryRow(query)
@@ -59,10 +74,9 @@ func (s *UserStorage) User(uid int) (*events.User, error) {
 
 	// golang convention to use Err to start the Err name
 	if err == sql.ErrNoRows {
-		// todo:: return not found
-		return nil, err
+		return nil, errors2.Wrap(&events.ErrNotFound{Err: err}, op, "executing query")
 	} else if err != nil {
-		return nil, err
+		return nil, errors2.Wrap(err, op, "executing query")
 	}
 
 	u.ID = uid

@@ -2,6 +2,8 @@ package http
 
 import (
 	"context"
+	"errors"
+	"events/pkg/events"
 	"fmt"
 	"net/http"
 )
@@ -33,8 +35,13 @@ func (a *App) addUserToSession(handler http.Handler) http.Handler {
 
 		u, err := a.UserService.User(uid)
 		if err != nil {
-			// todo:: handle error (remove session)
-			fmt.Println(err)
+			notFoundErr := &events.ErrNotFound{}
+			if errors.As(err, &notFoundErr) {
+				a.Session.Remove(r, sessionKeyUser)
+				handler.ServeHTTP(w, r)
+				return
+			}
+			a.serverError(w, r, err)
 			return
 		}
 
@@ -54,7 +61,7 @@ func (a *App) addUserToSession(handler http.Handler) http.Handler {
 func (a App) authenticatedUser(next http.Handler) http.Handler {
 	f := func(w http.ResponseWriter, r *http.Request) {
 		if r.Context().Value("user") == nil {
-			http.Redirect(w, r, "/login", http.StatusUnauthorized)
+			http.Redirect(w, r, fmt.Sprintf("/login?return_url=%s", r.URL), http.StatusUnauthorized)
 			return
 		}
 

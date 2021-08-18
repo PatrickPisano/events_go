@@ -1,6 +1,7 @@
 package services
 
 import (
+	errors2 "events/pkg/errors"
 	"events/pkg/events"
 	"events/pkg/storage/postgres"
 	"golang.org/x/crypto/bcrypt"
@@ -15,6 +16,8 @@ type UserService struct {
 }
 
 func (s *UserService) CreateUser(u *events.User, password string) (int, error) {
+	const op = "userService.CreateUser"
+
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), 12)
 	if err != nil {
 		return 0, err
@@ -22,7 +25,7 @@ func (s *UserService) CreateUser(u *events.User, password string) (int, error) {
 
 	ee, err := s.r.SaveUser(u, string(hash))
 	if err != nil {
-		return 0, err
+		return 0, errors2.Wrap(err, op, "calling repo to save user")
 	}
 
 	return ee, nil
@@ -34,7 +37,7 @@ func (s *UserService) EmailMatchPassword(email string, password string) (bool, i
 		return false, 0, err
 	}
 
-	bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
+	err = bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
 	if err == bcrypt.ErrMismatchedHashAndPassword {
 		return false, 0, nil
 	} else if err != nil {

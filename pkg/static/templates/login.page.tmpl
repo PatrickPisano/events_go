@@ -4,14 +4,19 @@
 
 {{define "body"}}
 <form method="POST">
+    {{with .Data}}
+        {{if .LoginFailed}}
+          <p>Email and password does not match</p>
+        {{end}}
+    {{end}}
     <div>
         <div>Email</div>
-        <input type="email" name="email">
+        <input type="email" name="email" {{with .Data}}{{if .Email}}value="{{.Email}}"{{end}}{{end}} required>
     </div>
 
     <div>
         <div>Password</div>
-        <input type="password" name="password">
+        <input type="password" name="password" required>
     </div>
 
     <button type="submit">Submit</button>

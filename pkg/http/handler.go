@@ -8,6 +8,7 @@ import (
 	"github.com/golangcollege/sessions"
 	"github.com/gorilla/mux"
 	"html/template"
+	"io/ioutil"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -20,11 +21,16 @@ const (
 	sessionKeyFlash = "flash"
 )
 
+const (
+	defaultMultipartFormMaxMemory = 32 << 20 // 32 * 2 ^ 20 = 32mb
+)
+
 type App struct {
 	EventService *services.EventService
 	UserService *services.UserService
 	Session *sessions.Session
 	TemplateCache map[string]*template.Template
+	UploadDir string
 }
 
 func (a *App) home(w http.ResponseWriter, r *http.Request) {
@@ -36,7 +42,7 @@ func (a *App) showEventForm(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) createEvent(w http.ResponseWriter, r *http.Request) {
-	err := r.ParseForm()
+	err := r.ParseMultipartForm(defaultMultipartFormMaxMemory)
 	if err != nil {
 		fmt.Println(err)
 		// todo:: handle client error
@@ -51,8 +57,23 @@ func (a *App) createEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := a.EventService.CreateEvent(e, emails, u.ID)
+	file, _, err := r.FormFile("cover_image")
 	if err != nil {
+		// todo:: redisplay the form with the data
+		fmt.Println(err)
+		return
+	}
+
+	fileBytes, err := ioutil.ReadAll(file)
+	if err != nil {
+		// todo:: handle error
+		fmt.Println(err)
+		return
+	}
+
+	id, err := a.EventService.CreateEvent(e, emails, fileBytes, "jpg", u.ID)
+	if err != nil {
+		// todo:: handle error
 		fmt.Println(err)
 		return
 	}
@@ -144,7 +165,9 @@ func (a *App) showEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	a.render(w, r, "event-detail.page.tmpl", e)
+	a.render(w, r, "event-detail.page.tmpl", struct {
+		Event *events.Event
+	}{e})
 }
 
 func (a *App) contact(w http.ResponseWriter, r *http.Request) {
@@ -172,8 +195,16 @@ func (a *App) register(w http.ResponseWriter, r *http.Request) {
 
 	_, err = a.UserService.CreateUser(u, password)
 	if err != nil {
-		//todo:: check error due to duplicate emails
-		fmt.Println("error", err)
+		conflictErr := &events.ErrConflict{}
+		if errors.As(err, &conflictErr) {
+			a.render(w, r, "register.page.tmpl", struct {
+				DuplicateEmail bool
+				Names string
+				Email       string
+			}{true, u.Names,u.Email})
+			return
+		}
+		a.serverError(w, r, err)
 		return
 	}
 
@@ -193,24 +224,40 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	returnURL := r.FormValue("return_url")
+	if returnURL == "" {
+		returnURL = "/"
+	}
+
 	email := r.PostForm.Get("email")
 	password := r.PostForm.Get("password")
 
 	match, id, err := a.UserService.EmailMatchPassword(email, password)
 	if err != nil {
-		//todo:: check error due to duplicate emails
-		fmt.Println("error", err)
+		notFoundErr := &events.ErrNotFound{}
+		if errors.As(err, &notFoundErr) {
+			a.render(w, r, "login.page.tmpl", struct{
+				LoginFailed bool
+				Email string
+			}{true, email})
+			return
+		}
+		a.serverError(w ,r, err)
 		return
 	}
 
-	if match {
-		a.Session.Put(r, sessionKeyUser, id) // todo:: use a const to save keys
-		w.Write([]byte("Logged in"))
-	} else {
-		w.Write([]byte("Login was not successful"))
+	// email valid but didn't match password
+	if !match {
+		a.render(w, r, "login.page.tmpl", struct{
+			LoginFailed bool
+			Email string
+		}{true, email})
+		return
 	}
 
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	a.Session.Put(r, sessionKeyUser, id)
+
+	http.Redirect(w, r, returnURL, http.StatusSeeOther)
 	// 303 good for when people need to be redirected after signing up, etc
 	// http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
@@ -356,8 +403,8 @@ func eventFromRequest(r *http.Request) (*events.Event, []string) {
 		Title: r.PostForm.Get("title"),
 		Description: r.PostForm.Get("description"),
 		Link: r.PostForm.Get("link"),
-		StartTime: startTime,
-		EndTime: stopTime,
+		StartTime: &startTime,
+		EndTime: &stopTime,
 		WelcomeMessage: r.PostForm.Get("welcome_message"),
 		IsPublished: false,
 	}

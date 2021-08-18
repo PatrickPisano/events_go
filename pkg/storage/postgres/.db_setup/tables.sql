@@ -31,27 +31,15 @@ CREATE TABLE events
         ON DELETE CASCADE
 );
 
-DROP TABLE IF EXISTS user_events;
-CREATE TABLE user_events
-(
-    user_id INT,
-    event_id INT,
-    has_responded BOOLEAN DEFAULT FALSE,
-    response BOOLEAN DEFAULT FALSE,
-
-    FOREIGN KEY (user_id)
-        REFERENCES users (id)
-        ON DELETE CASCADE,
-    FOREIGN KEY (event_id)
-        REFERENCES events (id)
-        ON DELETE CASCADE
-);
-
 DROP TABLE IF EXISTS event_invitations;
 CREATE TABLE event_invitations
 (
     email VARCHAR(128),
     event_id INT,
+    has_responded BOOLEAN DEFAULT FALSE,
+    response BOOLEAN DEFAULT FALSE,
+    token CHAR(32),
+    responded_at timestamptz,
 
     UNIQUE (email, event_id),
     FOREIGN KEY (event_id)

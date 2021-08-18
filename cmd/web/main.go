@@ -10,12 +10,15 @@ import (
 	"github.com/golangcollege/sessions"
 	_ "github.com/lib/pq"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 )
 
 func main() {
 	addr := flag.String("addr", "127.0.0.1:5000", "HTTP Network Address")
 	dsn := flag.String("dsn", "host=localhost port=5432 user=events_user password=password dbname=events sslmode=disable", "Postgresql database connection info")
+	uploadDir := flag.String("uploadDir", "../uploads", "File upload directory")
 	flag.Parse()
 
 	db, err := sql.Open("postgres", *dsn)
@@ -28,7 +31,7 @@ func main() {
 		panic(err)
 	}
 
-	eventRepo := postgres.NewEventStorage(db)
+	eventRepo := postgres.NewEventStorage(db, *uploadDir)
 	eventService := services.NewEventService(eventRepo)
 
 	userRepo := postgres.NewUserStorage(db)
@@ -43,11 +46,18 @@ func main() {
 		panic(err)
 	}
 
+	// init upload path
+	err = os.MkdirAll(filepath.Join(".", *uploadDir), os.ModeDir)
+	if err != nil {
+		panic(err)
+	}
+
 	app := http2.App{
 		EventService: eventService,
 		UserService: userService,
 		Session: session,
 		TemplateCache: templateCache,
+		UploadDir: *uploadDir,
 	}
 
 	serv := &http.Server{

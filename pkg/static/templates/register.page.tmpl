@@ -4,24 +4,32 @@
 
 {{define "body"}}
 <form method="POST">
+    {{with .Data}}
+        {{if .DuplicateEmail}}
+            <p>Email already exists</p>
+        {{end}}
+    {{end}}
     <div>
         <div>Names</div>
-        <input name="names">
+        <input name="names" {{with .Data}}{{if .Names}}value="{{.Names}}"{{end}}{{end}} required>
     </div>
 
     <div>
         <div>Email</div>
-        <input type="email" name="email">
+        <input type="email" name="email" required>
+        {{with .Data}}
+            {{with .Data.DuplicateEmail}}<span>Email is already in use.</span>{{end}}
+        {{end}}
     </div>
 
     <div>
         <div>Password</div>
-        <input type="password" name="password">
+        <input type="password" name="password" required>
     </div>
 
     <div>
         <div>Confirm password</div>
-        <input type="password" name="password-confirmation">
+        <input type="password" name="password-confirmation" required>
     </div>
 
     <button type="submit">Submit</button>

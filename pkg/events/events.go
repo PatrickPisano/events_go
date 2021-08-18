@@ -7,8 +7,9 @@ type Event struct {
 	Title          string
 	Description    string
 	Link           string
-	StartTime      time.Time
-	EndTime        time.Time
+	StartTime      *time.Time
+	EndTime        *time.Time
+	CoverImagePath string
 	WelcomeMessage string
 	HostID		   int
 	IsPublished    bool

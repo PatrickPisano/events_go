@@ -3,7 +3,10 @@
 {{define "title"}}Event detail{{end}}
 
 {{define "body"}}
-<h1>{{.Data.Title}}</h1>
+{{.Data.Event}}
+<h1>{{.Data.Event.Title}}</h1>
 
-<a href="/events/{{.Data.ID}}/edit">Edit</a>
+<img src="/uploads/{{.Data.Event.CoverImagePath}}">
+
+<a href="/events/{{.Data.Event.ID}}/edit">Edit</a>
 {{end}}

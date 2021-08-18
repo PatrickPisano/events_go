@@ -1,16 +1,8 @@
 {{define "form"}}
-<form method="post">
+<form method="post" enctype="multipart/form-data">
     <input type="text" name="title" placeholder="Title" {{with .Data}}value="{{.Title}}"{{end}}>
     <input type="text" name="description" placeholder="Invitation description">
     Mode
-    <select name="is_virtual">
-        <option value="virtual">Virtual</option>
-        <option value="physical">Physical</option>
-    </select>
-    <div>
-        Address
-        <textarea name="address" placeholder="address"></textarea>
-    </div>
     <input type="text" name="link" placeholder="link">
     <input type="datetime-local" name="start_time" placeholder="start_time">
     <input type="datetime-local" name="end_time" placeholder="end_time">
@@ -24,6 +16,8 @@
     </div>
 
     <input type="hidden" name="timezone" value="" id="timezone-input">
+
+    <input type="file" name="cover_image">
 
     <button type="submit">Submit</button>
 </form>

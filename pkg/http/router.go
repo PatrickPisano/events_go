@@ -38,5 +38,8 @@ func (a *App) Routes() http.Handler {
 	m.PathPrefix("/static/").Handler(
 		http.StripPrefix("/static/", http.FileServer(http.Dir("./pkg/static"))))
 
+	m.PathPrefix("/uploads/").Handler(
+		http.StripPrefix("/uploads/", http.FileServer(http.Dir(a.UploadDir))))
+
 	return m
 }
